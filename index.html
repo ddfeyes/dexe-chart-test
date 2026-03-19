@@ -3,256 +3,428 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DEXE/USDT Price Chart — agent3 (minimax)</title>
+  <title>DEXE/USDT — Live Chart</title>
+  <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      background: #0a0e1a;
-      color: #e2e8f0;
-      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
+      align-items: center;
     }
-    header {
-      background: linear-gradient(135deg, #1a1f35, #0d1224);
-      border-bottom: 1px solid #2a3550;
-      padding: 20px 32px;
+
+    .header {
+      width: 100%;
+      max-width: 1200px;
+      padding: 20px 24px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .pair-info {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .pair-logo {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #161b22;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 700;
+      border: 1px solid #30363d;
+    }
+
+    .pair-name {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+    }
+
+    .pair-exchange {
+      font-size: 12px;
+      color: #8b949e;
+      background: #161b22;
+      padding: 2px 8px;
+      border-radius: 12px;
+      border: 1px solid #30363d;
+    }
+
+    .stats {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    .stat {
+      text-align: right;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-value {
+      font-size: 16px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stat-change {
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .stat-change.up   { color: #3fb950; }
+    .stat-change.down { color: #f85149; }
+
+    .chart-wrapper {
+      width: 100%;
+      max-width: 1200px;
+      padding: 0 24px;
+    }
+
+    #chart {
+      width: 100%;
+      height: 520px;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid #30363d;
+    }
+
+    .controls {
+      width: 100%;
+      max-width: 1200px;
+      padding: 12px 24px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .controls label {
+      font-size: 13px;
+      color: #8b949e;
+    }
+
+    .controls select {
+      background: #161b22;
+      color: #e6edf3;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .controls select:focus {
+      outline: none;
+      border-color: #58a6ff;
+    }
+
+    .controls .spacer { flex: 1; }
+
+    .status-bar {
+      width: 100%;
+      max-width: 1200px;
+      padding: 0 24px 20px;
       display: flex;
       align-items: center;
       gap: 16px;
-    }
-    .logo {
-      width: 42px; height: 42px;
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
-      border-radius: 10px;
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 700; font-size: 18px; color: #fff;
-    }
-    .header-title { font-size: 22px; font-weight: 700; }
-    .header-sub { font-size: 13px; color: #64748b; margin-top: 2px; }
-    .badge {
-      margin-left: auto;
-      background: #1e2840;
-      border: 1px solid #334155;
-      border-radius: 6px;
-      padding: 6px 12px;
       font-size: 12px;
-      color: #94a3b8;
+      color: #8b949e;
     }
-    .main { flex: 1; padding: 24px 32px; display: flex; flex-direction: column; gap: 20px; }
-    .stats-row {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 16px;
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #3fb950;
+      animation: pulse 2s infinite;
     }
-    .stat-card {
-      background: #111827;
-      border: 1px solid #1e293b;
-      border-radius: 12px;
-      padding: 20px;
-      transition: border-color 0.2s;
+
+    .status-dot.error { background: #f85149; animation: none; }
+    .status-dot.loading { background: #d29922; animation: pulse 1s infinite; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
     }
-    .stat-card:hover { border-color: #334155; }
-    .stat-label { font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
-    .stat-value { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
-    .stat-change { font-size: 13px; margin-top: 4px; }
-    .positive { color: #22c55e; }
-    .negative { color: #ef4444; }
-    .neutral { color: #94a3b8; }
-    .chart-card {
-      background: #111827;
-      border: 1px solid #1e293b;
-      border-radius: 12px;
-      padding: 24px;
-      flex: 1;
+
+    .footer {
+      width: 100%;
+      max-width: 1200px;
+      padding: 0 24px 24px;
+      font-size: 11px;
+      color: #484f58;
+      text-align: center;
     }
-    .chart-header {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 20px;
-    }
-    .chart-title { font-size: 16px; font-weight: 600; }
-    .timeframes { display: flex; gap: 6px; }
-    .tf-btn {
-      background: none; border: 1px solid #1e293b;
-      color: #64748b; border-radius: 6px;
-      padding: 5px 10px; font-size: 12px; cursor: pointer;
-      transition: all 0.15s;
-    }
-    .tf-btn.active, .tf-btn:hover {
-      background: #6366f1; border-color: #6366f1; color: #fff;
-    }
-    canvas { width: 100% !important; }
-    .footer { padding: 16px 32px; text-align: center; font-size: 12px; color: #334155; border-top: 1px solid #1a2035; }
-    .loading { color: #475569; text-align: center; padding: 40px; }
-    .error-msg { color: #ef4444; text-align: center; padding: 20px; font-size: 14px; }
   </style>
 </head>
 <body>
-  <header>
-    <div class="logo">D</div>
-    <div>
-      <div class="header-title">DEXE / USDT</div>
-      <div class="header-sub">DeXe Protocol — Live Price Dashboard</div>
-    </div>
-    <div class="badge">agent3 · minimax</div>
-  </header>
 
-  <div class="main">
-    <div class="stats-row">
-      <div class="stat-card">
-        <div class="stat-label">Price (USD)</div>
-        <div class="stat-value" id="price">—</div>
-        <div class="stat-change" id="change24h">Loading…</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Market Cap</div>
-        <div class="stat-value" id="mcap" style="font-size:20px">—</div>
-        <div class="stat-change neutral" id="mcap-rank">—</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">24h Volume</div>
-        <div class="stat-value" id="vol24" style="font-size:20px">—</div>
-        <div class="stat-change" id="vol-change">—</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">24h High / Low</div>
-        <div class="stat-value" id="high24" style="font-size:20px">—</div>
-        <div class="stat-change neutral" id="low24">Low: —</div>
-      </div>
+<div class="header">
+  <div class="pair-info">
+    <div class="pair-logo">Ð</div>
+    <span class="pair-name">DEXE / USDT</span>
+    <span class="pair-exchange">CoinGecko</span>
+  </div>
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-label">Price</div>
+      <div class="stat-value" id="price">—</div>
     </div>
-
-    <div class="chart-card">
-      <div class="chart-header">
-        <div class="chart-title">Price History</div>
-        <div class="timeframes">
-          <button class="tf-btn" data-days="1">1D</button>
-          <button class="tf-btn active" data-days="7">7D</button>
-          <button class="tf-btn" data-days="30">30D</button>
-          <button class="tf-btn" data-days="90">90D</button>
-        </div>
-      </div>
-      <canvas id="priceChart" height="280"></canvas>
-      <div class="loading" id="chartLoading">Loading chart data…</div>
-      <div class="error-msg" id="chartError" style="display:none"></div>
+    <div class="stat">
+      <div class="stat-label">24h Change</div>
+      <div class="stat-change up" id="change">—</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">24h Volume</div>
+      <div class="stat-value" id="volume">—</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Market Cap</div>
+      <div class="stat-value" id="mcap">—</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">ATH</div>
+      <div class="stat-value" id="ath">—</div>
     </div>
   </div>
+</div>
 
-  <div class="footer">Data: CoinGecko API · Refreshes every 60s · agent3 (minimax)</div>
+<div class="controls">
+  <label>Timeframe:</label>
+  <select id="timeframe">
+    <option value="1">1 minute</option>
+    <option value="5">5 minutes</option>
+    <option value="15">15 minutes</option>
+    <option value="30">30 minutes</option>
+    <option value="60" selected>1 hour</option>
+    <option value="240">4 hours</option>
+    <option value="1440">1 day</option>
+  </select>
+  <div class="spacer"></div>
+  <span id="last-update" style="font-size:12px;color:#8b949e;"></span>
+</div>
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script>
-    const fmt = (n, d=2) => n == null ? '—' : Number(n).toLocaleString('en-US', {minimumFractionDigits:d, maximumFractionDigits:d});
-    const fmtB = n => { if (!n) return '—'; if (n>=1e9) return '$'+fmt(n/1e9,2)+'B'; if (n>=1e6) return '$'+fmt(n/1e6,2)+'M'; return '$'+fmt(n,0); };
+<div class="chart-wrapper">
+  <div id="chart"></div>
+</div>
 
-    let chart = null;
+<div class="status-bar">
+  <div class="status-dot loading" id="dot"></div>
+  <span id="status-text">Connecting to CoinGecko…</span>
+</div>
 
-    async function fetchStats() {
-      try {
-        const r = await fetch('https://api.coingecko.com/api/v3/coins/dexe?localization=false&tickers=false&community_data=false&developer_data=false');
-        const d = await r.json();
-        const m = d.market_data;
+<div class="footer">
+  Data provided by CoinGecko · Chart by TradingView Lightweight Charts
+</div>
 
-        document.getElementById('price').textContent = '$' + fmt(m.current_price.usd, 4);
-        
-        const ch = m.price_change_percentage_24h;
-        const chEl = document.getElementById('change24h');
-        chEl.textContent = (ch >= 0 ? '+' : '') + fmt(ch, 2) + '% (24h)';
-        chEl.className = 'stat-change ' + (ch >= 0 ? 'positive' : 'negative');
+<script>
+// ─── State ────────────────────────────────────────────────────────────────────
+const COINGECKO_ID = 'dexe';
+const REFRESH_MS   = 30_000;
+let currentTf      = 60;
+let chartApi       = null;
+let candleSeries   = null;
+let volumeSeries   = null;
+let refreshTimer   = null;
 
-        document.getElementById('mcap').textContent = fmtB(m.market_cap.usd);
-        document.getElementById('mcap-rank').textContent = 'Rank #' + d.market_cap_rank;
-        document.getElementById('vol24').textContent = fmtB(m.total_volume.usd);
-        document.getElementById('high24').textContent = '$' + fmt(m.high_24h.usd, 4);
-        document.getElementById('low24').textContent = 'Low: $' + fmt(m.low_24h.usd, 4);
-      } catch(e) {
-        console.warn('Stats fetch failed', e);
-      }
-    }
+// ─── CoinGecko ────────────────────────────────────────────────────────────────
+async function fetchMarket() {
+  const url = `https://api.coingecko.com/api/v3/coins/${COINGECKO_ID}?localization=false&tickers=false&community_data=false&developer_data=false`;
+  const r   = await fetch(url);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
 
-    async function fetchChart(days) {
-      document.getElementById('chartLoading').style.display = 'block';
-      document.getElementById('chartError').style.display = 'none';
-      try {
-        const r = await fetch(`https://api.coingecko.com/api/v3/coins/dexe/market_chart?vs_currency=usd&days=${days}`);
-        const d = await r.json();
-        const prices = d.prices;
+async function fetchOHLC(tfMinutes) {
+  const days = tfMinutes <= 60 ? 1 : tfMinutes <= 1440 ? 7 : 30;
+  const url  = `https://api.coingecko.com/api/v3/coins/${COINGECKO_ID}/ohlc?vs_currency=usd&days=${days}`;
+  const r    = await fetch(url);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json(); // [[timestamp, open, high, low, close], …]
+}
 
-        const labels = prices.map(p => {
-          const dt = new Date(p[0]);
-          return days <= 1
-            ? dt.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'})
-            : dt.toLocaleDateString('en-US', {month:'short', day:'numeric'});
-        });
-        const values = prices.map(p => p[1]);
+// ─── Chart Setup ─────────────────────────────────────────────────────────────
+function initChart() {
+  const container = document.getElementById('chart');
+  container.innerHTML = '';
 
-        const gradient = document.getElementById('priceChart').getContext('2d').createLinearGradient(0,0,0,300);
-        gradient.addColorStop(0, 'rgba(99,102,241,0.35)');
-        gradient.addColorStop(1, 'rgba(99,102,241,0.01)');
+  const chart = LightweightCharts.createChart(container, {
+    width:  container.clientWidth,
+    height: 520,
+    layout: {
+      background: { type: 'solid', color: '#0d1117' },
+      textColor:  '#8b949e',
+    },
+    grid: {
+      vertLines:   { color: '#161b22' },
+      horzLines:   { color: '#161b22' },
+    },
+    crosshair: {
+      mode: LightweightCharts.CrosshairMode.Normal,
+      vertLine: { color: '#58a6ff', labelBackgroundColor: '#1f6feb' },
+      horzLine: { color: '#58a6ff', labelBackgroundColor: '#1f6feb' },
+    },
+    rightPriceScale: {
+      borderColor: '#30363d',
+      scaleMargins: { top: 0.08, bottom: 0.25 },
+    },
+    timeScale: {
+      borderColor:    '#30363d',
+      timeVisible:    true,
+      secondsVisible: false,
+    },
+  });
 
-        if (chart) chart.destroy();
-        chart = new Chart(document.getElementById('priceChart'), {
-          type: 'line',
-          data: {
-            labels,
-            datasets: [{
-              label: 'DEXE/USDT',
-              data: values,
-              borderColor: '#6366f1',
-              backgroundColor: gradient,
-              borderWidth: 2,
-              pointRadius: 0,
-              tension: 0.3,
-              fill: true,
-            }]
-          },
-          options: {
-            responsive: true,
-            interaction: { mode: 'index', intersect: false },
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                backgroundColor: '#1e293b',
-                borderColor: '#334155',
-                borderWidth: 1,
-                titleColor: '#94a3b8',
-                bodyColor: '#e2e8f0',
-                callbacks: {
-                  label: ctx => ' $' + fmt(ctx.parsed.y, 4)
-                }
-              }
-            },
-            scales: {
-              x: {
-                ticks: { color: '#475569', maxTicksLimit: 8, maxRotation: 0 },
-                grid: { color: '#1a2035' }
-              },
-              y: {
-                ticks: { color: '#475569', callback: v => '$' + fmt(v, 4) },
-                grid: { color: '#1a2035' }
-              }
-            }
-          }
-        });
-        document.getElementById('chartLoading').style.display = 'none';
-      } catch(e) {
-        document.getElementById('chartLoading').style.display = 'none';
-        document.getElementById('chartError').style.display = 'block';
-        document.getElementById('chartError').textContent = 'Chart load failed: ' + e.message;
-      }
-    }
+  candleSeries = chart.addCandlestickSeries({
+    upColor:          '#3fb950',
+    downColor:        '#f85149',
+    borderUpColor:    '#3fb950',
+    borderDownColor:  '#f85149',
+    wickUpColor:      '#3fb950',
+    wickDownColor:    '#f85149',
+  });
 
-    document.querySelectorAll('.tf-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        fetchChart(btn.dataset.days);
-      });
-    });
+  volumeSeries = chart.addHistogramSeries({
+    color:         '#3fb95066',
+    priceFormat:   { type: 'volume' },
+    priceScaleId:  'volume',
+  });
+  chart.priceScale('volume').applyOptions({
+    scaleMargins: { top: 0.8, bottom: 0 },
+  });
 
-    fetchStats();
-    fetchChart(7);
-    setInterval(fetchStats, 60000);
-  </script>
+  // Resize observer
+  const ro = new ResizeObserver(() => {
+    chart.applyOptions({ width: container.clientWidth });
+  });
+  ro.observe(container);
+
+  return chart;
+}
+
+// ─── Format Helpers ───────────────────────────────────────────────────────────
+function fmt(num, decimals = 2) {
+  if (num === null || num === undefined) return '—';
+  if (num >= 1e9)  return (num / 1e9).toFixed(2) + 'B';
+  if (num >= 1e6)  return (num / 1e6).toFixed(2) + 'M';
+  if (num >= 1e3)  return (num / 1e3).toFixed(2) + 'K';
+  return num.toFixed(decimals);
+}
+
+function fmtPct(v) {
+  if (v === null || v === undefined) return '—';
+  const sign = v >= 0 ? '+' : '';
+  return `${sign}${v.toFixed(2)}%`;
+}
+
+// ─── Update Stats ─────────────────────────────────────────────────────────────
+function updateStats(data) {
+  const usd   = data.market_data;
+  const price = usd.current_price.usd;
+
+  document.getElementById('price').textContent  = '$' + fmt(price, price < 1 ? 4 : 2);
+
+  const chg = usd.price_change_percentage_24h;
+  const chgEl = document.getElementById('change');
+  chgEl.textContent = fmtPct(chg);
+  chgEl.className = 'stat-change ' + (chg >= 0 ? 'up' : 'down');
+
+  document.getElementById('volume').textContent = '$' + fmt(usd.total_volume.usd);
+  document.getElementById('mcap').textContent   = '$' + fmt(usd.market_cap.usd);
+  document.getElementById('ath').textContent    = '$' + fmt(usd.ath.usd, price < 1 ? 4 : 2);
+
+  const updated = new Date(data.last_updated);
+  document.getElementById('last-update').textContent =
+    'Updated: ' + updated.toLocaleTimeString();
+}
+
+// ─── Update Chart ─────────────────────────────────────────────────────────────
+function updateChart(ohlcData) {
+  // CoinGecko returns [timestamp_ms, open, high, low, close]
+  const candleData = ohlcData.map(([t, o, h, l, c]) => ({
+    time:  Math.floor(t / 1000),
+    open:  o,
+    high:  h,
+    low:   l,
+    close: c,
+  }));
+
+  const volData = ohlcData.map(([t, o, , , c]) => ({
+    time:  Math.floor(t / 1000),
+    value: Math.abs(c - o),
+    color: c >= o ? '#3fb95044' : '#f8514944',
+  }));
+
+  candleSeries.setData(candleData);
+  volumeSeries.setData(volData);
+
+  if (candleData.length > 0) {
+    chartApi.timeScale().scrollToRealTime();
+  }
+}
+
+// ─── Status ───────────────────────────────────────────────────────────────────
+function setStatus(text, type) {
+  // type: 'ok' | 'error' | 'loading'
+  const dot  = document.getElementById('dot');
+  const tEl  = document.getElementById('status-text');
+  dot.className  = 'status-dot ' + (type === 'error' ? 'error' : type === 'loading' ? 'loading' : '');
+  tEl.textContent = text;
+}
+
+// ─── Load ─────────────────────────────────────────────────────────────────────
+async function load() {
+  setStatus('Fetching market data…', 'loading');
+  try {
+    const [market, ohlc] = await Promise.all([
+      fetchMarket(),
+      fetchOHLC(currentTf),
+    ]);
+
+    updateStats(market);
+    updateChart(ohlc);
+    setStatus('Live · auto-refreshes every 30s', 'ok');
+  } catch (err) {
+    console.error(err);
+    setStatus('Error: ' + err.message, 'error');
+  }
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+const chartEl = document.getElementById('chart');
+chartApi = initChart();
+
+document.getElementById('timeframe').addEventListener('change', e => {
+  currentTf = parseInt(e.target.value, 10);
+  clearInterval(refreshTimer);
+  load().then(() => {
+    refreshTimer = setInterval(load, REFRESH_MS);
+  });
+});
+
+load();
+refreshTimer = setInterval(load, REFRESH_MS);
+</script>
 </body>
 </html>
