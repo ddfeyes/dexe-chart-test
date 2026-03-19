@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DEXE/USDT Price Chart</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg-color: #0f1115;
+      --card-bg: #1c1f26;
+      --text-main: #e0e0e0;
+      --text-muted: #888;
+      --accent: #00bcd4;
+      --accent-glow: rgba(0, 188, 212, 0.2);
+      --positive: #00e676;
+      --negative: #ff5252;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 20px;
+      background: var(--bg-color);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    h1 {
+      font-size: 2rem;
+      font-weight: 300;
+      margin: 0;
+      letter-spacing: 1px;
+    }
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-top: 4px;
+    }
+    .stats {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .stat-card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 16px 24px;
+      min-width: 140px;
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      transition: transform 0.2s;
+    }
+    .stat-card:hover {
+      transform: translateY(-2px);
+    }
+    .stat-card .label {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .stat-card .value {
+      font-size: 1.4rem;
+      font-weight: 600;
+    }
+    .change-positive { color: var(--positive); }
+    .change-negative { color: var(--negative); }
+    .chart-container {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      height: 450px;
+      position: relative;
+    }
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .chart-title {
+      font-size: 1.1rem;
+      font-weight: 500;
+      margin: 0;
+    }
+    .last-updated {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    canvas {
+      width: 100% !important;
+      height: 350px !important;
+    }
+    @media (max-width: 600px) {
+      .stats { gap: 8px; }
+      .stat-card { min-width: 100px; padding: 12px 16px; }
+      .stat-card .value { font-size: 1.2rem; }
+      .chart-container { height: 350px; padding: 12px; }
+      canvas { height: 280px !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>DEXE/USDT</h1>
+      <div class="subtitle">Real-time Price Chart</div>
+    </header>
+
+    <div class="stats">
+      <div class="stat-card">
+        <div class="label">Current Price</div>
+        <div class="value" id="price">Loading...</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">24h Change</div>
+        <div class="value" id="change">--</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">24h Volume (USDT)</div>
+        <div class="value" id="volume">--</div>
+      </div>
+    </div>
+
+    <div class="chart-container">
+      <div class="chart-header">
+        <h2 class="chart-title">Price History (24h)</h2>
+        <div class="last-updated" id="lastUpdated">--</div>
+      </div>
+      <canvas id="priceChart"></canvas>
+    </div>
+  </div>
+
+  <script>
+    const symbol = 'DEXEUSDT';
+    const baseUrl = 'https://api.binance.com/api/v3';
+    let priceChart = null;
+
+    function formatPrice(price) {
+      const p = parseFloat(price);
+      if (p < 0.01) return p.toFixed(6);
+      if (p < 1) return p.toFixed(4);
+      if (p < 10) return p.toFixed(3);
+      return p.toFixed(2);
+    }
+
+    function formatVolume(vol) {
+      const v = parseFloat(vol);
+      if (v >= 1e6) {
+        return (v / 1e6).toFixed(2) + 'M';
+      } else if (v >= 1e3) {
+        return (v / 1e3).toFixed(2) + 'K';
+      }
+      return v.toFixed(2);
+    }
+
+    function formatTime(timestamp) {
+      const date = new Date(timestamp);
+      return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    }
+
+    async function fetchWithErrorHandling(url) {
+      try {
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(\`HTTP \${resp.status}\`);
+        return await resp.json();
+      } catch (err) {
+        console.error('Fetch error:', err);
+        return null;
+      }
+    }
+
+    async function updateStats() {
+      const data = await fetchWithErrorHandling(\`\${baseUrl}/ticker/24hr?symbol=\${symbol}\`);
+      if (!data) {
+        document.getElementById('price').textContent = 'N/A';
+        document.getElementById('change').textContent = '--';
+        document.getElementById('volume').textContent = '--';
+        return;
+      }
+
+      const priceEl = document.getElementById('price');
+      const changeEl = document.getElementById('change');
+      const volumeEl = document.getElementById('volume');
+
+      priceEl.textContent = formatPrice(data.lastPrice);
+      volumeEl.textContent = formatVolume(data.volume) + ' USDT';
+
+      const change = parseFloat(data.priceChangePercent);
+      changeEl.textContent = (change >= 0 ? '+' : '') + change.toFixed(2) + '%';
+      changeEl.className = 'value ' + (change >= 0 ? 'change-positive' : 'change-negative');
+
+      document.getElementById('lastUpdated').textContent = 'Updated: ' + new Date().toLocaleTimeString();
+    }
+
+    async function renderChart() {
+      const klines = await fetchWithErrorHandling(\`\${baseUrl}/klines?symbol=\${symbol}&interval=1h&limit=24\`);
+      if (!klines || klines.length === 0) {
+        console.warn('No klines data');
+        return;
+      }
+
+      const labels = klines.map(k => formatTime(k[0]));
+      const prices = klines.map(k => parseFloat(k[4])); // close price
+
+      const ctx = document.getElementById('priceChart').getContext('2d');
+      if (priceChart) priceChart.destroy();
+
+      const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+      gradient.addColorStop(0, 'rgba(0, 188, 212, 0.4)');
+      gradient.addColorStop(1, 'rgba(0, 188, 212, 0)');
+
+      priceChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'DEXE/USDT',
+            data: prices,
+            borderColor: '#00bcd4',
+            backgroundColor: gradient,
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 0,
+            pointHoverRadius: 6,
+            pointHoverBackgroundColor: '#00bcd4',
+            pointHoverBorderColor: '#fff',
+            pointHoverBorderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: {
+            intersect: false,
+            mode: 'index'
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: 'rgba(28, 31, 38, 0.9)',
+              titleColor: '#e0e0e0',
+              bodyColor: '#e0e0e0',
+              borderColor: '#333',
+              borderWidth: 1,
+              padding: 10,
+              displayColors: false,
+              callbacks: {
+                label: function(context) {
+                  return 'Price: ' + formatPrice(context.parsed.y);
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: '#333', drawBorder: false },
+              ticks: { color: '#888', maxTicksLimit: 12, font: { size: 10 } }
+            },
+            y: {
+              grid: { color: '#333', drawBorder: false },
+              ticks: { color: '#888', font: { size: 10 }, callback: (value) => formatPrice(value) }
+            }
+          }
+        }
+      });
+    }
+
+    async function init() {
+      await updateStats();
+      await renderChart();
+      setInterval(updateStats, 10000);
+      setInterval(async () => {
+        await renderChart();
+        await updateStats();
+      }, 60000);
+    }
+
+    init();
+  </script>
+</body>
+</html>
